@@ -9,7 +9,7 @@ Identify the variety of a dry bean from its measured shape and size features. Th
 - **Dataset:** [Dry Bean Dataset](https://archive.ics.uci.edu/dataset/602/dry+bean+dataset), UCI Machine Learning Repository.
 - **Size:** 13,611 records, 16 numeric input features, and seven target classes in the `Class` column: BARBUNYA, BOMBAY, CALI, DERMASON, HOROZ, SEKER, and SIRA.
 - **License:** CC BY 4.0. [UCI dataset citation](https://doi.org/10.24432/C50S4B)
-- **Evaluation split:** A shuffled, stratified five-fold group split with `random_state=42`; the first fold is created for testing (10,889 training records and 2,722 test records). Identical features are kept in the same group to prevent duplicates across the train/test splits.
+- **Evaluation split:** The dataset was split into ~ 80% training and 20% testing using a stratified, group-aware split. It exhibited a moderate class imbalance and exploratory analysis also revealed duplicate feature rows. So stratification was used to maintain similar class proportions across both sets, while grouping ensured that identical feature rows remained within the same partition in order to minimize duplicate related data leakage.
 
 ## GitHub repository
 
@@ -29,6 +29,10 @@ All five models use the same test set. Precision, recall, and F1 are macro-avera
 | Gaussian Naive Bayes | 0.8942 | 0.9909 | 0.9044 | 0.9023 | 0.9024 | 0.8727 |
 | Support Vector Machine | 0.9298 | 0.9908 | 0.9423 | 0.9388 | 0.9405 | 0.9151 |
 
+The Dry Bean dataset contains seven classes with an uneven distribution. DERMASON is the majority class with 3,546 observations (26.1%), while BOMBAY is the minority class with 522 observations (3.8%).
+
+So the model metrics, Precision, Recall, and F1 are evaluated using **macro averaging**, which calculates each metric separately for all seven classes and takes their unweighted average. This ensures that every bean variety contributes equally to the evaluation, regardless of its frequency in the dataset.
+
 ### Performance observations
 
 | ML model | Observation |
@@ -39,7 +43,7 @@ All five models use the same test set. Precision, recall, and F1 are macro-avera
 | Gaussian Naive Bayes | Has a high AUC (0.9909), but lower accuracy and macro F1. Its probability ranking is stronger than its final class predictions on this test set. |
 | Support Vector Machine | Best accuracy, macro precision, macro recall, macro F1, and MCC. It has the strongest overall classification results by macro F1. |
 
-**Overall winner: Support Vector Machine**, with the highest macro F1 (0.9405). Logistic Regression has the highest macro AUC (0.9949), so it performs best by that ranking metric.
+**Overall winner: Support Vector Machine**, with the highest macro F1 (0.9405). Logistic Regression has the highest macro AUC (0.9949), so it performs best by that ranking metric. To be noted is that SVM had beaten logistic regression by a very thin margin on the test split.
 
 ## Streamlit app
 
@@ -63,6 +67,6 @@ The uploaded CSV must contain these exact, case-sensitive headers:
 Area,Perimeter,MajorAxisLength,MinorAxisLength,AspectRation,Eccentricity,ConvexArea,EquivDiameter,Extent,Solidity,roundness,Compactness,ShapeFactor1,ShapeFactor2,ShapeFactor3,ShapeFactor4,Class
 ```
 
-Each feature column must contain numeric values. `Class` must contain one of `BARBUNYA`, `BOMBAY`, `CALI`, `DERMASON`, `HOROZ`, `SEKER`, or `SIRA`. Add one labeled bean per row; the downloaded template contains only the header row. Column order may vary, and additional columns are ignored.
+Each feature column must contain numeric values. `Class` must contain one of `BARBUNYA`, `BOMBAY`, `CALI`, `DERMASON`, `HOROZ`, `SEKER`, or `SIRA`. Add one labeled bean per row; the downloaded template contains only the header row. Column order may vary, and any additional columns are ignored.
 
-The app also provides model selection, evaluation metrics, a confusion matrix, a per-class report, and a record-level prediction explorer.
+The app also provides a model selector, evaluation metrics, confusion matrix, per-class classification report, and a prediction explorer.
