@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import altair as alt
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -80,8 +81,10 @@ def calculate_metrics(model, features: pd.DataFrame, targets: pd.Series) -> dict
         "classes": classes,
     }
 
-st.title("BeanLab")
-st.caption("UCI Dry Bean · Model Evaluation")
+with st.container(border=True):
+    st.badge("UCI DRY BEAN · MODEL EVALUATION", color="green")
+    st.title("BeanLab 🫘")
+    st.write("Compare models and see how well each bean variety is recognized.")
 
 missing_models = [name for name, path in MODEL_PATHS.items() if not path.is_file()]
 if missing_models:
@@ -101,7 +104,7 @@ with st.sidebar:
         type=["csv"],
         help="CSV must contain all 16 Dry Bean features and a Class column.",
     )
-    selected_model_name = st.selectbox("Model detail", list(MODEL_PATHS))
+    selected_model_name = st.selectbox("Model to inspect", list(MODEL_PATHS))
     st.caption("The app loads saved models and evaluates the uploaded data; it does not retrain.")
     with st.expander("Dataset citation"):
         st.markdown(
@@ -115,7 +118,7 @@ if uploaded_file is None:
     if not TEST_DATA_PATH.is_file():
         fail("Upload a labeled CSV; the bundled test_data.csv was not found.")
     evaluation_data = pd.read_csv(TEST_DATA_PATH)
-    st.caption("Showing the bundled test data. Upload another labeled CSV to evaluate it.")
+    data_source = "Bundled test split"
 else:
     if uploaded_file.size > MAX_UPLOAD_BYTES:
         fail(f"The uploaded file is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB. Upload only the test split.")
@@ -123,6 +126,12 @@ else:
         evaluation_data = pd.read_csv(uploaded_file)
     except Exception as error:
         fail("Could not read the uploaded CSV.", error)
+    data_source = f"Uploaded · {uploaded_file.name}"
+
+st.badge(
+    f"Evaluation source · {data_source}",
+    color="blue" if uploaded_file is not None else "green",
+)
 
 if evaluation_data.empty:
     fail("The CSV contains no data rows.")
@@ -164,73 +173,152 @@ comparison = pd.DataFrame(comparison_rows).sort_values("F1", ascending=False)
 selected_result = evaluation_results[selected_model_name]
 selected_model = load_model(str(MODEL_PATHS[selected_model_name]))
 
-summary_left, summary_right = st.columns([1, 3])
-with summary_left:
-    st.metric("Rows evaluated", f"{len(evaluation_data):,}")
-    st.metric("Input features", len(feature_columns))
-    observed_counts = y_eval.value_counts()
-
-with summary_right:
-    class_counts = y_eval.value_counts().reindex(class_names, fill_value=0)
-    st.bar_chart(class_counts.rename("Rows"), height=250, color="#28735f")
-
-st.subheader("All-model comparison")
-st.dataframe(
-    comparison.style.format(
-        {metric: "{:.3f}" for metric in ["Accuracy", "AUC", "Precision", "Recall", "F1", "MCC"]}
-    ),
-    width="stretch",
-    hide_index=True,
+overview_tab, comparison_tab, explorer_tab = st.tabs(
+    ["Overview", "Model Comparison", "Bean Explorer"]
 )
-st.caption("Precision, recall, and F1 use macro averaging; AUC is macro one-vs-rest.")
 
-st.subheader(selected_model_name)
-metric_columns = st.columns(6)
-for column, metric in zip(metric_columns, ["Accuracy", "AUC", "Precision", "Recall", "F1", "MCC"]):
-    value = selected_result[metric]
-    column.metric(metric, "N/A" if pd.isna(value) else f"{value:.3f}")
+with overview_tab:
+    class_counts = y_eval.value_counts().reindex(class_names, fill_value=0)
+    st.subheader("Evaluation overview")
+    summary_columns = st.columns(4)
+    summary_metrics = [
+        ("Rows evaluated", f"{len(evaluation_data):,}"),
+        ("Input features", f"{len(feature_columns)}"),
+        ("Bean varieties", f"{len(observed_class_names)} / {len(class_names)}"),
+        ("Models evaluated", f"{len(evaluation_results)}"),
+    ]
+    for column, (label, value) in zip(summary_columns, summary_metrics):
+        with column.container(border=True):
+            st.metric(label, value)
 
-detail_left, detail_right = st.columns([1.15, 1])
-with detail_left:
-    st.markdown("#### Confusion matrix")
-    matrix = confusion_matrix(y_eval, selected_result["predictions"], labels=class_names)
-    figure, axis = plt.subplots(figsize=(8, 6))
-    sns.heatmap(
-        matrix,
-        annot=True,
-        fmt="d",
-        cmap="YlGnBu",
-        xticklabels=class_names,
-        yticklabels=class_names,
-        ax=axis,
+    st.markdown("#### Class distribution")
+    st.caption("Number of evaluated records in each bean variety.")
+    class_distribution = pd.DataFrame(
+        {"Class": class_counts.index, "Records": class_counts.to_numpy()}
     )
-    axis.set_xlabel("Predicted class")
-    axis.set_ylabel("Actual class")
-    axis.tick_params(axis="x", labelrotation=35)
-    figure.tight_layout()
-    st.pyplot(figure)
-    plt.close(figure)
-
-with detail_right:
-    st.markdown("#### Per-class report")
-    report = classification_report(
-        y_eval,
-        selected_result["predictions"],
-        labels=class_names,
-        target_names=[str(name) for name in class_names],
-        output_dict=True,
-        zero_division=0,
+    distribution_chart = (
+        alt.Chart(class_distribution)
+        .mark_bar(color="#28735f", cornerRadiusEnd=5)
+        .encode(
+            x=alt.X("Records:Q", title="Evaluated records"),
+            y=alt.Y("Class:N", sort="-x", title=None),
+            tooltip=[
+                alt.Tooltip("Class:N"),
+                alt.Tooltip("Records:Q", format=","),
+            ],
+        )
+        .properties(height=280)
     )
-    report_frame = pd.DataFrame(report).T
+    st.altair_chart(distribution_chart, width="stretch")
+
+with comparison_tab:
+    best_row = comparison.iloc[0]
+    st.markdown("#### Best model by macro F1")
+    best_left, best_middle, best_right = st.columns(3)
+    with best_left.container(border=True):
+        st.caption("Top-performing model")
+        st.markdown(f"#### {best_row['Model']}")
+    with best_middle.container(border=True):
+        st.metric("Macro F1", f"{best_row['F1']:.3f}")
+    with best_right.container(border=True):
+        st.metric("MCC", f"{best_row['MCC']:.3f}")
+    st.caption("Highest macro F1 on the evaluated data; MCC is shown as a cross-check.")
+
+    chart_metric = st.selectbox(
+        "Metric to visualize",
+        ["F1", "Accuracy", "AUC", "Precision", "Recall", "MCC"],
+        format_func=lambda metric: {
+            "F1": "Macro F1",
+            "Accuracy": "Accuracy",
+            "AUC": "Macro AUC",
+            "Precision": "Macro precision",
+            "Recall": "Macro recall",
+            "MCC": "Matthews correlation coefficient",
+        }[metric],
+    )
+    f1_chart = (
+        alt.Chart(comparison)
+        .mark_bar(color="#28735f", cornerRadiusEnd=5)
+        .encode(
+            x=alt.X(
+                f"{chart_metric}:Q",
+                title=chart_metric,
+                scale=alt.Scale(domain=[-1, 1] if chart_metric == "MCC" else [0, 1]),
+            ),
+            y=alt.Y(
+                "Model:N",
+                sort="-x",
+                title=None,
+                axis=alt.Axis(labelLimit=180),
+            ),
+            tooltip=[
+                alt.Tooltip("Model:N"),
+                alt.Tooltip(f"{chart_metric}:Q", format=".3f"),
+            ],
+        )
+        .properties(height=220)
+    )
+    st.altair_chart(f1_chart, width="stretch")
+
+    st.subheader("All-model comparison")
     st.dataframe(
-        report_frame.loc[
-            [*map(str, class_names), "macro avg", "weighted avg"],
-            ["precision", "recall", "f1-score", "support"],
-        ].style.format({"precision": "{:.3f}", "recall": "{:.3f}", "f1-score": "{:.3f}", "support": "{:.0f}"}),
+        comparison.style.format(
+            {metric: "{:.3f}" for metric in ["Accuracy", "AUC", "Precision", "Recall", "F1", "MCC"]}
+        ),
         width="stretch",
+        hide_index=True,
     )
+    st.caption("Precision, recall, and F1 use macro averaging; AUC is macro one-vs-rest.")
 
-with st.expander("Inspect one evaluated record"):
+    st.subheader(selected_model_name)
+    metric_columns = st.columns(6)
+    for column, metric in zip(metric_columns, ["Accuracy", "AUC", "Precision", "Recall", "F1", "MCC"]):
+        value = selected_result[metric]
+        column.metric(metric, "N/A" if pd.isna(value) else f"{value:.3f}")
+
+    detail_left, detail_right = st.columns([1.15, 1])
+    with detail_left:
+        st.markdown("#### Confusion matrix")
+        matrix = confusion_matrix(y_eval, selected_result["predictions"], labels=class_names)
+        figure, axis = plt.subplots(figsize=(8, 6))
+        sns.heatmap(
+            matrix,
+            annot=True,
+            fmt="d",
+            cmap="YlGnBu",
+            xticklabels=class_names,
+            yticklabels=class_names,
+            ax=axis,
+        )
+        axis.set_xlabel("Predicted class")
+        axis.set_ylabel("Actual class")
+        axis.tick_params(axis="x", labelrotation=35)
+        figure.tight_layout()
+        st.pyplot(figure)
+        plt.close(figure)
+
+    with detail_right:
+        st.markdown("#### Per-class report")
+        report = classification_report(
+            y_eval,
+            selected_result["predictions"],
+            labels=class_names,
+            target_names=[str(name) for name in class_names],
+            output_dict=True,
+            zero_division=0,
+        )
+        report_frame = pd.DataFrame(report).T
+        st.dataframe(
+            report_frame.loc[
+                [*map(str, class_names), "macro avg", "weighted avg"],
+                ["precision", "recall", "f1-score", "support"],
+            ].style.format({"precision": "{:.3f}", "recall": "{:.3f}", "f1-score": "{:.3f}", "support": "{:.0f}"}),
+            width="stretch",
+        )
+
+with explorer_tab:
+    st.markdown("#### Inspect an evaluated record")
+    st.caption("Choose an actual variety and record to compare its prediction and confidence.")
     actual_class = st.selectbox("Actual bean class", observed_class_names)
     class_positions = np.flatnonzero(y_eval.to_numpy() == actual_class).tolist()
     selected_position = st.selectbox(
@@ -246,14 +334,53 @@ with st.expander("Inspect one evaluated record"):
     sample_prediction = selected_model.predict(sample_features)[0]
     sample_probabilities = selected_model.predict_proba(sample_features)[0]
     sample_left, sample_right = st.columns([1, 2])
-    sample_left.metric("Predicted variety", str(sample_prediction))
-    sample_left.text(f"Actual variety: {y_eval.iloc[selected_position]}")
-    sample_left.metric("Prediction confidence", f"{sample_probabilities.max():.1%}")
-    sample_right.bar_chart(
-        pd.Series(sample_probabilities, index=selected_model.classes_, name="Probability"),
-        color="#e6a544",
-    )
+    with sample_left:
+        with st.container(border=True):
+            actual_class = y_eval.iloc[selected_position]
+            is_correct = sample_prediction == actual_class
+            st.badge(
+                "Correct prediction" if is_correct else "Misclassified",
+                color="green" if is_correct else "red",
+            )
+            st.metric("Predicted variety", str(sample_prediction))
+            st.caption(f"Actual variety · {actual_class}")
+            st.metric("Prediction confidence", f"{sample_probabilities.max():.1%}")
+    with sample_right:
+        probability_frame = pd.DataFrame(
+            {
+                "Variety": selected_model.classes_,
+                "Probability": sample_probabilities,
+            }
+        )
+        probability_chart = (
+            alt.Chart(probability_frame)
+            .mark_bar(color="#28735f", cornerRadiusEnd=4)
+            .encode(
+                x=alt.X("Probability:Q", title="Prediction probability", scale=alt.Scale(domain=[0, 1])),
+                y=alt.Y("Variety:N", sort="-x", title=None),
+                tooltip=[
+                    alt.Tooltip("Variety:N"),
+                    alt.Tooltip("Probability:Q", format=".1%"),
+                ],
+            )
+            .properties(height=240)
+        )
+        st.altair_chart(probability_chart, width="stretch")
     st.markdown("#### Measured features")
-    feature_values = sample_features.iloc[0].rename("Value").to_frame()
-    feature_values.index.name = "Feature"
-    st.dataframe(feature_values, width="stretch")
+    feature_values = (
+        sample_features.iloc[0]
+        .rename("Value")
+        .rename_axis("Feature")
+        .reset_index()
+    )
+    st.dataframe(
+        feature_values,
+        column_config={
+            "Feature": st.column_config.TextColumn("Feature", width="medium"),
+            "Value": st.column_config.NumberColumn(
+                "Value", width="small", alignment="left"
+            ),
+        },
+        width=420,
+        hide_index=True,
+    )
