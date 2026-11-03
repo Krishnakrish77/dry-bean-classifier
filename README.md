@@ -53,4 +53,16 @@ All five models use the same test set. Precision, recall, and F1 are macro-avera
   streamlit run app.py
   ```
 
-The app loads the five saved models without retraining. It evaluates the bundled test data by default or accepts a labeled CSV up to 10 MB containing all 16 features and the `Class` target. It provides model selection, evaluation metrics, a confusion matrix, a per-class report, a record-level prediction explorer.
+The app loads the five saved models without retraining. It evaluates the bundled test data by default or accepts a labeled CSV up to 10 MB. The sidebar includes a downloadable CSV template and lists the required columns.
+
+### Upload format
+
+The uploaded CSV must contain these exact, case-sensitive headers:
+
+```csv
+Area,Perimeter,MajorAxisLength,MinorAxisLength,AspectRation,Eccentricity,ConvexArea,EquivDiameter,Extent,Solidity,roundness,Compactness,ShapeFactor1,ShapeFactor2,ShapeFactor3,ShapeFactor4,Class
+```
+
+Each feature column must contain numeric values. `Class` must contain one of `BARBUNYA`, `BOMBAY`, `CALI`, `DERMASON`, `HOROZ`, `SEKER`, or `SIRA`. Add one labeled bean per row; the downloaded template contains only the header row. Column order may vary, and additional columns are ignored.
+
+The app also provides model selection, evaluation metrics, a confusion matrix, a per-class report, and a record-level prediction explorer.

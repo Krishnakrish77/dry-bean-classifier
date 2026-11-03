@@ -84,7 +84,7 @@ def calculate_metrics(model, features: pd.DataFrame, targets: pd.Series) -> dict
 with st.container(border=True):
     st.badge("UCI DRY BEAN · MODEL EVALUATION", color="green")
     st.title("BeanLab 🫘")
-    st.write("Compare models and see how well each bean variety is recognized.")
+    st.write("Compare and explore five different machine learning models classify dry bean varieties using geometric features.")
 
 missing_models = [name for name, path in MODEL_PATHS.items() if not path.is_file()]
 if missing_models:
@@ -97,6 +97,9 @@ try:
 except Exception as error:
     fail("Could not load the saved model metadata.", error)
 
+required_columns = [*feature_columns, TARGET_COLUMN]
+csv_template = pd.DataFrame(columns=required_columns).to_csv(index=False).encode("utf-8")
+
 with st.sidebar:
     st.subheader("Evaluation setup")
     uploaded_file = st.file_uploader(
@@ -104,6 +107,21 @@ with st.sidebar:
         type=["csv"],
         help="CSV must contain all 16 Dry Bean features and a Class column.",
     )
+    st.download_button(
+        "Download CSV template",
+        data=csv_template,
+        file_name="dry_bean_test_template.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+    with st.expander("Required CSV columns"):
+        st.caption("Headers are case-sensitive. Add one labeled bean record per row.")
+        st.code(",".join(required_columns), language="text")
+        st.caption(
+            "All 16 feature values must be numeric. Class must be one of: "
+            + ", ".join(class_names)
+            + "."
+        )
     selected_model_name = st.selectbox("Model to inspect", list(MODEL_PATHS))
     st.caption("The app loads saved models and evaluates the uploaded data; it does not retrain.")
     with st.expander("Dataset citation"):
@@ -136,7 +154,6 @@ st.badge(
 if evaluation_data.empty:
     fail("The CSV contains no data rows.")
 
-required_columns = [*feature_columns, TARGET_COLUMN]
 missing_columns = [column for column in required_columns if column not in evaluation_data.columns]
 if missing_columns:
     fail("Required columns are missing.", ", ".join(map(str, missing_columns)))
@@ -363,7 +380,7 @@ with explorer_tab:
                     alt.Tooltip("Probability:Q", format=".1%"),
                 ],
             )
-            .properties(height=240)
+            .properties(height=300)
         )
         st.altair_chart(probability_chart, width="stretch")
     st.markdown("#### Measured features")
