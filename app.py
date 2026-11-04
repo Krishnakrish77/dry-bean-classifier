@@ -112,7 +112,7 @@ with st.sidebar:
         data=csv_template,
         file_name="dry_bean_test_template.csv",
         mime="text/csv",
-        use_container_width=True,
+        width="stretch",
     )
     with st.expander("Required CSV columns"):
         st.caption("Headers are case-sensitive. Add one labeled bean record per row.")
@@ -279,9 +279,11 @@ with comparison_tab:
 
     st.subheader("All-model comparison")
     st.dataframe(
-        comparison.style.format(
-            {metric: "{:.3f}" for metric in ["Accuracy", "AUC", "Precision", "Recall", "F1", "MCC"]}
-        ),
+        comparison,
+        column_config={
+            metric: st.column_config.NumberColumn(format="%.3f")
+            for metric in ["Accuracy", "AUC", "Precision", "Recall", "F1", "MCC"]
+        },
         width="stretch",
         hide_index=True,
     )
@@ -325,17 +327,24 @@ with comparison_tab:
             zero_division=0,
         )
         report_frame = pd.DataFrame(report).T
+        report_table = report_frame.loc[
+            [*map(str, class_names), "macro avg", "weighted avg"],
+            ["precision", "recall", "f1-score", "support"],
+        ]
         st.dataframe(
-            report_frame.loc[
-                [*map(str, class_names), "macro avg", "weighted avg"],
-                ["precision", "recall", "f1-score", "support"],
-            ].style.format({"precision": "{:.3f}", "recall": "{:.3f}", "f1-score": "{:.3f}", "support": "{:.0f}"}),
+            report_table,
+            column_config={
+                "precision": st.column_config.NumberColumn(format="%.3f"),
+                "recall": st.column_config.NumberColumn(format="%.3f"),
+                "f1-score": st.column_config.NumberColumn(format="%.3f"),
+                "support": st.column_config.NumberColumn(format="%.0f"),
+            },
             width="stretch",
         )
 
 with explorer_tab:
     st.markdown("#### Inspect an evaluated record")
-    st.caption("Choose an actual variety and record to compare its prediction and confidence.")
+    st.caption("Choose an actual variety and record to compare the prediction with its label.")
     actual_class = st.selectbox("Actual bean class", observed_class_names)
     class_positions = np.flatnonzero(y_eval.to_numpy() == actual_class).tolist()
     selected_position = st.selectbox(
@@ -350,19 +359,18 @@ with explorer_tab:
     sample_features = X_eval.iloc[[selected_position]]
     sample_prediction = selected_model.predict(sample_features)[0]
     sample_probabilities = selected_model.predict_proba(sample_features)[0]
-    sample_left, sample_right = st.columns([1, 2])
-    with sample_left:
-        with st.container(border=True):
-            actual_class = y_eval.iloc[selected_position]
-            is_correct = sample_prediction == actual_class
-            st.badge(
-                "Correct prediction" if is_correct else "Misclassified",
-                color="green" if is_correct else "red",
-            )
-            st.metric("Predicted variety", str(sample_prediction))
-            st.caption(f"Actual variety · {actual_class}")
-            st.metric("Prediction confidence", f"{sample_probabilities.max():.1%}")
-    with sample_right:
+    actual_class = y_eval.iloc[selected_position]
+    is_correct = sample_prediction == actual_class
+    result_column, probability_column = st.columns([1, 2])
+    with result_column.container(border=True):
+        st.badge(
+            "Correct prediction" if is_correct else "Misclassified",
+            color="green" if is_correct else "red",
+        )
+        st.metric("Predicted variety", str(sample_prediction))
+        st.metric("Actual variety", str(actual_class))
+    with probability_column:
+        st.markdown("#### Class probability estimates")
         probability_frame = pd.DataFrame(
             {
                 "Variety": selected_model.classes_,
@@ -373,14 +381,18 @@ with explorer_tab:
             alt.Chart(probability_frame)
             .mark_bar(color="#28735f", cornerRadiusEnd=4)
             .encode(
-                x=alt.X("Probability:Q", title="Prediction probability", scale=alt.Scale(domain=[0, 1])),
+                x=alt.X(
+                    "Probability:Q",
+                    title="Estimated class probability",
+                    scale=alt.Scale(domain=[0, 1]),
+                ),
                 y=alt.Y("Variety:N", sort="-x", title=None),
                 tooltip=[
                     alt.Tooltip("Variety:N"),
                     alt.Tooltip("Probability:Q", format=".1%"),
                 ],
             )
-            .properties(height=300)
+            .properties(height=240)
         )
         st.altair_chart(probability_chart, width="stretch")
     st.markdown("#### Measured features")
