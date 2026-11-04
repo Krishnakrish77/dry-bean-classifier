@@ -15,7 +15,29 @@ Identify the variety of a dry bean from its measured shape and size features. Th
 
 [Krishnakrish77/dry-bean-classifier](https://github.com/Krishnakrish77/dry-bean-classifier)
 
-The repository includes `app.py`, `requirements.txt`, the test split `test_data.csv`, five saved model pipelines in `model/`, and the `model/training.ipynb` notebook.
+### Repository structure
+
+```text
+dry-bean-classifier/
+├── .gitignore
+├── .streamlit/
+│   └── config.toml
+├── LICENSE
+├── README.md
+├── app.py
+├── requirements.txt
+├── test_data.csv
+└── model/
+    ├── data/
+    │   ├── dry-bean-dataset.zip
+    │   └── dry_bean.csv
+    ├── decision_tree.joblib
+    ├── gaussian_naive_bayes.joblib
+    ├── knn.joblib
+    ├── logistic_regression.joblib
+    ├── support_vector_machine.joblib
+    └── training.ipynb
+```
 
 ## Models and evaluation
 
