@@ -43,7 +43,7 @@ So the model metrics, Precision, Recall, and F1 are evaluated using **macro aver
 | Gaussian Naive Bayes | Has a high AUC (0.9909), but lower accuracy and macro F1. Its probability ranking is stronger than its final class predictions on this test set. |
 | Support Vector Machine | Best accuracy, macro precision, macro recall, macro F1, and MCC. It has the strongest overall classification results by macro F1. |
 
-**Overall winner: Support Vector Machine**, with the highest macro F1 (0.9405). Logistic Regression has the highest macro AUC (0.9949), so it performs best by that ranking metric. To be noted is that SVM had beaten logistic regression by a very thin margin on the test split.
+**Overall winner: Support Vector Machine**, with the highest macro F1 (0.9405). Logistic Regression has the highest macro AUC (0.9949), so it performs best by that ranking metric. To be noted is that SVM had beaten logistic regression by a very thin margin, indicating that both models performed comparably on this test split.
 
 ## Streamlit app
 

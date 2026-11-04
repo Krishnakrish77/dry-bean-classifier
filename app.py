@@ -84,7 +84,7 @@ def calculate_metrics(model, features: pd.DataFrame, targets: pd.Series) -> dict
 with st.container(border=True):
     st.badge("UCI DRY BEAN · MODEL EVALUATION", color="green")
     st.title("BeanLab 🫘")
-    st.write("Compare and explore five different machine learning models classify dry bean varieties using geometric features.")
+    st.write("Compare and explore how five different machine learning models classify dry bean varieties using the bean's geometric features.")
 
 missing_models = [name for name, path in MODEL_PATHS.items() if not path.is_file()]
 if missing_models:
